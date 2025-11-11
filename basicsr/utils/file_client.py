@@ -1,6 +1,17 @@
 # Modified from https://github.com/open-mmlab/mmcv/blob/master/mmcv/fileio/file_client.py  # noqa: E501
 from abc import ABCMeta, abstractmethod
+from pathlib import Path
 
+def add_x4_if_parent_is_X4(filepath):
+    path = Path(filepath)
+    
+    # Check if parent directory name is "X4"
+    if path.parent.name == "X4":
+        # Add x4 before the extension
+        new_path = path.parent / f"{path.stem}x4{path.suffix}"
+        return str(new_path)
+    else:
+        return filepath
 
 class BaseStorageBackend(metaclass=ABCMeta):
     """Abstract class of storage backends.
@@ -46,6 +57,8 @@ class MemcachedBackend(BaseStorageBackend):
 
     def get(self, filepath):
         filepath = str(filepath)
+        filepath = add_x4_if_parent_is_X4(filepath)
+        
         import mc
         self._client.Get(filepath, self._mc_buffer)
         value_buf = mc.ConvertBuffer(self._mc_buffer)
@@ -60,6 +73,7 @@ class HardDiskBackend(BaseStorageBackend):
 
     def get(self, filepath):
         filepath = str(filepath)
+        filepath = add_x4_if_parent_is_X4(filepath)
         with open(filepath, 'rb') as f:
             value_buf = f.read()
         return value_buf

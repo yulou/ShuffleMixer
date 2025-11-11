@@ -215,16 +215,25 @@ def paired_paths_from_folder(folders, keys, filename_tmpl):
     assert len(keys) == 2, f'The len of keys should be 2 with [input_key, gt_key]. But got {len(keys)}'
     input_folder, gt_folder = folders
     input_key, gt_key = keys
-
+    print("input_folder {}, gt_folder {}".format(input_folder, gt_folder))
+    print("input_key {}, gt_key {}".format(input_key, gt_key))
     input_paths = list(scandir(input_folder))
     gt_paths = list(scandir(gt_folder))
     assert len(input_paths) == len(gt_paths), (f'{input_key} and {gt_key} datasets have different number of images: '
                                                f'{len(input_paths)}, {len(gt_paths)}.')
     paths = []
+    #print(input_paths)
+    #print(gt_paths)
+    #print("filename_tmpl {}".format(filename_tmpl))
+    # going through the file in gt_paths and check if it exists in input_path
     for gt_path in gt_paths:
         basename, ext = osp.splitext(osp.basename(gt_path))
         input_name = f'{filename_tmpl.format(basename)}{ext}'
         input_path = osp.join(input_folder, input_name)
+        #print("basename {}, ext {}, input_name {}, input_path {}".format(basename, ext, input_name, input_folder))
+        if "x4" not in input_name:
+            name_parts = input_name.split(".")
+            input_name = name_parts[0] + "x4." + name_parts[1]
         assert input_name in input_paths, f'{input_name} is not in {input_key}_paths.'
         gt_path = osp.join(gt_folder, gt_path)
         paths.append(dict([(f'{input_key}_path', input_path), (f'{gt_key}_path', gt_path)]))
