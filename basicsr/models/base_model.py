@@ -20,6 +20,14 @@ class BaseModel():
         self.schedulers = []
         self.optimizers = []
 
+    # [Yulou] Additional interfaces
+    def set_train(self, epoch):
+        pass
+    def set_eval(self, epoch):
+        pass
+    def eval(self, epoch, val_loader, eval_loss_dict):
+        pass
+    # [Yulou] Additional interfaces end
     def feed_data(self, data):
         pass
 

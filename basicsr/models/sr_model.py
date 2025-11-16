@@ -25,6 +25,8 @@ class SRModel(BaseModel):
 
         # load pretrained models
         load_path = self.opt['path'].get('pretrain_network_g', None)
+        logger = get_root_logger()
+        logger.info(f"In SRModel, load_path {load_path}")
         if load_path is not None:
             param_key = self.opt['path'].get('param_key_g', 'params')
             self.load_network(self.net_g, load_path, self.opt['path'].get('strict_load_g', True), param_key)
@@ -93,6 +95,37 @@ class SRModel(BaseModel):
         optim_type = train_opt['optim_g'].pop('type')
         self.optimizer_g = self.get_optimizer(optim_type, optim_params, **train_opt['optim_g'])
         self.optimizers.append(self.optimizer_g)
+    def set_train(self, epoch):
+        logger = get_root_logger()
+        #logger.info(f'In SRModel, Epoch {epoch}: set model to train()')
+        self.net_g.train()
+    def set_eval(self, epoch):
+        logger = get_root_logger()
+        #logger.info(f'In SRModel, Epoch {epoch}: set model to eval()')
+        self.net_g.eval()
+    def eval(self, epoch, val_loader, eval_loss_dict):
+        eval_loss = 0.0
+        batch_num = 0
+        logger = get_root_logger()
+        with torch.no_grad():  # CRITICAL: Disables gradient computation
+            for valData in val_loader:
+                #logger.info(f"eval_data shape lq {valData['lq'].shape} gt {valData['gt'].shape}")
+                # obtain image data from loader
+                lq_images = valData['lq'].to(self.device)        # Low-quality images
+                gt_images = valData['gt'].to(self.device)        # Ground truth images
+                # do a forward pass using net_g
+                pred_sr_img = self.net_g(lq_images)
+                # calculate loss
+                if self.cri_pix:
+                    l_pix = self.cri_pix(pred_sr_img, gt_images)
+                    eval_loss += l_pix
+                batch_num += 1
+            if batch_num > 0:
+                eval_loss /= batch_num
+                eval_loss_dict[epoch] = eval_loss
+                logger.info(f"Epoch {epoch}: Validation Loss: {eval_loss:.4f}")
+            else:
+                logger.info(f"Epoch {epoch}: Invalid batch_num for eval")
 
     def feed_data(self, data):
         self.lq = data['lq'].to(self.device)

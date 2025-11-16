@@ -3,6 +3,8 @@ import logging
 import math
 import time
 import torch
+from torch.utils.data import random_split
+import numpy as np
 from os import path as osp
 
 from basicsr.data import build_dataloader, build_dataset
@@ -33,6 +35,15 @@ def create_train_val_dataloader(opt, logger):
         if phase == 'train':
             dataset_enlarge_ratio = dataset_opt.get('dataset_enlarge_ratio', 1)
             train_set = build_dataset(dataset_opt)
+            dataset_size = len(train_set)
+            train_size = int(0.8 * dataset_size)  # 80% for training
+            eval_size = dataset_size - train_size  # 20% for evaluation
+
+            # Split the dataset
+            train_set, eval_set = random_split(
+                train_set, [train_size, eval_size],
+                generator=torch.Generator().manual_seed(opt['manual_seed'])  # for reproducibility
+            )
             train_sampler = EnlargedSampler(train_set, opt['world_size'], opt['rank'], dataset_enlarge_ratio)
             train_loader = build_dataloader(
                 train_set,
@@ -41,7 +52,14 @@ def create_train_val_dataloader(opt, logger):
                 dist=opt['dist'],
                 sampler=train_sampler,
                 seed=opt['manual_seed'])
-
+            eval_loader = build_dataloader(
+                eval_set,
+                dataset_opt,
+                num_gpu=opt['num_gpu'],
+                dist=opt['dist'],
+                sampler=None,  # Usually no sampler needed for eval
+                seed=opt['manual_seed']
+            )
             num_iter_per_epoch = math.ceil(
                 len(train_set) * dataset_enlarge_ratio / (dataset_opt['batch_size_per_gpu'] * opt['world_size']))
             total_iters = int(opt['train']['total_iter'])
@@ -62,7 +80,7 @@ def create_train_val_dataloader(opt, logger):
         else:
             raise ValueError(f'Dataset phase {phase} is not recognized.')
 
-    return train_loader, train_sampler, val_loaders, total_epochs, total_iters
+    return train_loader, train_sampler, eval_loader, val_loaders, total_epochs, total_iters
 
 
 def load_resume_state(opt):
@@ -118,7 +136,7 @@ def train_pipeline(root_path):
 
     # create train and validation dataloaders
     result = create_train_val_dataloader(opt, logger)
-    train_loader, train_sampler, val_loaders, total_epochs, total_iters = result
+    train_loader, train_sampler, eval_loader, val_loaders, total_epochs, total_iters = result
 
     # create model
     model = build_model(opt)
@@ -150,12 +168,16 @@ def train_pipeline(root_path):
     logger.info(f'Start training from epoch: {start_epoch}, iter: {current_iter}')
     data_timer, iter_timer = AvgTimer(), AvgTimer()
     start_time = time.time()
-
+    training_losses = {}
+    eval_losses = {}
     for epoch in range(start_epoch, total_epochs + 1):
         train_sampler.set_epoch(epoch)
         prefetcher.reset()
         train_data = prefetcher.next()
-
+        #logger.info(f"train_data shape lq {train_data['lq'].shape} gt {train_data['gt'].shape}")
+        model.set_train(epoch)
+        training_losses[epoch] = 0.0
+        batch_num = 0
         while train_data is not None:
             data_timer.record()
 
@@ -167,6 +189,9 @@ def train_pipeline(root_path):
             # training
             model.feed_data(train_data)
             model.optimize_parameters(current_iter)
+            # model would accumulate the loss at log_dict
+            training_losses[epoch] += model.get_current_log()['l_pix']
+            batch_num += 1
             iter_timer.record()
             if current_iter == 1:
                 # reset start time in msg_logger for more accurate eta_time
@@ -184,6 +209,11 @@ def train_pipeline(root_path):
             if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
                 logger.info('Saving models and training states.')
                 model.save(epoch, current_iter)
+                # [Yulou] dump training loss and eval loss
+                np_train_losses = np.array(torch.tensor(list(training_losses.values())).cpu())
+                np_eval_losses = np.array(torch.tensor(list(eval_losses.values())).cpu())
+                np.save("/home/yliusu/ShuffleMixer/model_weights/loss_data/train_losses_no_upsampling.npy", np_train_losses)
+                np.save("/home/yliusu/ShuffleMixer/model_weights/loss_data/eval_losses_no_upsampling.npy", np_eval_losses)
 
             # validation
             if opt.get('val') is not None and (current_iter % opt['val']['val_freq'] == 0):
@@ -196,8 +226,17 @@ def train_pipeline(root_path):
             iter_timer.start()
             train_data = prefetcher.next()
         # end of iter
-
+        # get average training loss for this epoch
+        if batch_num > 0:
+            training_losses[epoch] /= batch_num
+            logger.info(f"Epoch {epoch} training loss {training_losses[epoch]:.4f}")
+            model.set_eval(epoch)
+            #logger.info(f"Epoch {epoch} Model eval")
+            model.eval(epoch, eval_loader, eval_losses)
+        else:
+            logger.info(f"Epoch {epoch}: Invalid batch_num for train")
     # end of epoch
+
 
     consumed_time = str(datetime.timedelta(seconds=int(time.time() - start_time)))
     logger.info(f'End of training. Time consumed: {consumed_time}')
