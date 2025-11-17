@@ -147,38 +147,41 @@ class ShuffleMixer(nn.Module):
     def __init__(self, n_feats=64, kernel_size=7, n_blocks=5, mlp_ratio=2, upscaling_factor=4):
         super().__init__()
         self.scale = upscaling_factor
-
         self.to_feat = nn.Conv2d(3, n_feats, 3, 1, 1, bias=False)
 
         self.blocks = nn.Sequential(
             *[FMBlock(n_feats, kernel_size, mlp_ratio) for _ in range(n_blocks)]
         )
 
-        if self.scale == 4:
-            self.upsapling = nn.Sequential(
-                nn.Conv2d(n_feats, n_feats * 4, 1, 1, 0),
-                nn.PixelShuffle(2),
-                nn.SiLU(inplace=True),
-                nn.Conv2d(n_feats, n_feats * 4 , 1, 1, 0),
-                nn.PixelShuffle(2),
-                nn.SiLU(inplace=True)
-            )
-        else:
-            self.upsapling = nn.Sequential(
-                nn.Conv2d(n_feats, n_feats * self.scale * self.scale, 1, 1, 0),
-                nn.PixelShuffle(self.scale),
-                nn.SiLU(inplace=True)
-            )
+        #if self.scale == 4:
+        #    self.upsapling = nn.Sequential(
+        #        nn.Conv2d(n_feats, n_feats * 4, 1, 1, 0),
+        #        nn.PixelShuffle(2),
+        #        nn.SiLU(inplace=True),
+        #        nn.Conv2d(n_feats, n_feats * 4 , 1, 1, 0),
+        #        nn.PixelShuffle(2),
+        #        nn.SiLU(inplace=True)
+        #    )
+        #else:
+        #    self.upsapling = nn.Sequential(
+        #        nn.Conv2d(n_feats, n_feats * self.scale * self.scale, 1, 1, 0),
+        #        nn.PixelShuffle(self.scale),
+        #        nn.SiLU(inplace=True)
+        #    )
 
         self.tail = nn.Conv2d(n_feats, 3, 3, 1, 1)
 
     def forward(self, x):
         base = x
+        #print(f"[DEBUG] In shufflemixer_arch.py base shape {base.shape}")
         x = self.to_feat(x)
         x = self.blocks(x)
-        x = self.upsapling(x)
+        #x = self.upsapling(x)
+        x = F.interpolate(x, scale_factor=self.scale, mode='bilinear', align_corners=False)
         x = self.tail(x)
         base = F.interpolate(base, scale_factor=self.scale, mode='bilinear', align_corners=False)
+        #print(f"[DEBUG] In shufflemixer_arch.py base shape after interpolation {base.shape}")
+        #print(f"[DEBUG] In shufflemixer_arch.py x shape {x.shape}")
         return x + base
 
 if __name__ == '__main__':
