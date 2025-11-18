@@ -47,7 +47,7 @@ For `Memery` and `Runtime`, set 'print_modelsummary = False' and 'save_results =
 '''
 
 def main(args):
-    yulou_model_paths = "/home/yliusu/ShuffleMixer/experiments/ShuffleMixerSR_base_DF2K_300k_x4_08/models/net_g_55000.pth"
+    yulou_model_paths = args.pretrain_model
     #all_model_paths = os.listdir(yulou_model_paths)
     all_model_paths = [yulou_model_paths]
     # absolute path of models saved at different iterations
@@ -58,7 +58,9 @@ def main(args):
         util.mkdir(save_path)
 
         # Set log file
+        util.mkdir(osp.join(args.log_path, args.model_name))
         log_file = osp.join(args.log_path, args.model_name, f'MobileSR_{get_time_str()}.log')
+
         logger = get_root_logger(logger_name='MobileSR', log_level=logging.INFO, log_file=log_file)
 
         logger.info(torch.__version__)               # pytorch version
@@ -141,12 +143,14 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', type=str, default='ShuffleMixer', help='method name')
-    parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/Urban100/LR_bicubic/X4', help='Path to the LR image')
-    parser.add_argument('--log_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/no_upsampling', help='Path to log file')
+    parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/Set14/LR_bicubic/X4', help='Path to the LR image')
+                                                                                                #change
+    parser.add_argument('--log_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/baseline', help='Path to log file')
     parser.add_argument('--save_results', default='True', action='store_true', help='if true save SR results')
     parser.add_argument('--print_modelsummary', action='store_true', help='if true print modelsummary; set False when calculating `Max Memery` and `Runtime`')
-    parser.add_argument('--save_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/no_upsampling', help='Path to results')
-    parser.add_argument('--pretrain_model', type=str, default='/home/yliusu/ShuffleMixer/experiments/ShuffleMixerSR_base_DF2K_300k_x4_08/models/net_g_55000.pth', help='Path to the pretrained model')
+                                                                                                #change
+    parser.add_argument('--save_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/baseline', help='Path to results')
+    parser.add_argument('--pretrain_model', type=str, default='/home/yliusu/ShuffleMixer/model_weights/pretrain_model/shufflemixer_base_x4.pth', help='Path to the pretrained model')
     
     args = parser.parse_args()
 

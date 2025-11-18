@@ -47,7 +47,7 @@ For `Memery` and `Runtime`, set 'print_modelsummary = False' and 'save_results =
 '''
 
 def main(args):
-    yulou_model_paths = "/home/yliusu/ShuffleMixer/model_weights/pretrain_model/shufflemixer_base_x4.pth"
+    yulou_model_paths = args.pretrain_model
     #all_model_paths = os.listdir(yulou_model_paths)
     all_model_paths = [yulou_model_paths]
     # absolute path of models saved at different iterations
@@ -58,6 +58,7 @@ def main(args):
         util.mkdir(save_path)
 
         # Set log file
+        util.mkdir(osp.join(args.log_path, args.model_name))
         log_file = osp.join(args.log_path, args.model_name, f'MobileSR_{get_time_str()}.log')
         logger = get_root_logger(logger_name='MobileSR', log_level=logging.INFO, log_file=log_file)
 
@@ -108,7 +109,7 @@ def main(args):
         #only one image allowed
         single_path = [args.lr_path]
         for img in single_path:
-            dataset_name = img.split(os.sep)[-3]+"_pred"
+            dataset_name = img.split(os.sep)[-4]+"_pred"
             dataset_result_path = osp.join(save_path, dataset_name)
             if not os.path.exists(dataset_result_path):
                 util.mkdir(dataset_result_path)
@@ -144,14 +145,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', type=str, default='ShuffleMixer', help='method name')
     #parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/DIV2K_valid_LR_bicubic/X4/0891x4.png', help='Path to the LR image')
-    parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/DIV2K_train_LR_bicubic/X4/0678x4.png', help='Path to the LR image')
+    #parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/DIV2K_train_LR_bicubic/X4/0678x4.png', help='Path to the LR image')
+    
+    parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/B100/LR_bicubic/X4/227092x4.png', help='Path to the LR image')
+    #parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/Set14/LR_bicubic/X4/ppt3x4.png', help='Path to the LR image')
+    #parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/Set5/LR_bicubic/X4/butterflyx4.png', help='Path to the LR image')
+    #parser.add_argument('--lr_path', type=str, default='/home/yliusu/ShuffleMixer/datasets/Urban100/LR_bicubic/X4/img085x4.png', help='Path to the LR image')
                                                                                                 #change here
-    parser.add_argument('--log_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/no_upsampling', help='Path to log file')
+    parser.add_argument('--log_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/lower_iteration_lr_005', help='Path to log file')
     parser.add_argument('--save_results', default='True', action='store_true', help='if true save SR results')
-    parser.add_argument('--print_modelsummary', action='store_true', help='if true print modelsummary; set False when calculating `Max Memery` and `Runtime`')
+    parser.add_argument('--print_modelsummary',default='True', action='store_true', help='if true print modelsummary; set False when calculating `Max Memery` and `Runtime`')
                                                                                                 #change here
-    parser.add_argument('--save_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/no_upsampling', help='Path to results')
-    parser.add_argument('--pretrain_model', type=str, default='/home/yliusu/ShuffleMixer/experiments/ShuffleMixerSR_base_DF2K_300k_x4_08/models/net_g_55000.pth', help='Path to the pretrained model')
+    parser.add_argument('--save_path', type=str, default='/home/yliusu/ShuffleMixer/presentation/lower_iteration_lr_005', help='Path to results')
+    parser.add_argument('--pretrain_model', type=str, default='/home/yliusu/ShuffleMixer/model_weights/low_iter_lr_005/net_g_3000.pth', help='Path to the pretrained model')
     
     args = parser.parse_args()
 
